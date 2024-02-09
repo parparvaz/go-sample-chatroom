@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+
+    <style>
+        .chatbox {
+            outline: 1px solid silver;
+            min-height: 160px;
+            padding: 0.5em;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <h3 class="mt-3">This is a home page</h3>
+            <hr>
+        </div>
+        <div class="row">
+            <div class="col-md-8">
+                <h3>Chat</h3>
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input name="username" id="username" class="form-control" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <input name="message" id="message" class="form-control" autocomplete="off">
+                </div>
+
+                <hr>
+                <a href="javascript:void(0)" class="btn btn-outline-secondary" id="sendBtn">Send Message</a>
+                <hr>
+
+                <div id="output" class="chatbox"></div>
+            </div>
+            <div class="col-md-4">
+                <h3>Who's online</h3>
+                <ul id="online_users">
+
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+        integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js"
+        integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+"
+        crossorigin="anonymous"></script>
+<script>
+    let socket = null
+    const output = document.getElementById("output")
+
+    window.onbeforeunload = () => {
+        const res = {
+            "action": "left",
+        }
+
+        socket.send(JSON.stringify(res))
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        socket = new WebSocket("ws://localhost:8080/ws")
+
+        socket.onopen = () => {
+
+            console.log("connected to websocket")
+        }
+
+        socket.onclose = () => {
+            console.log("websocket closed")
+        }
+
+        socket.onerror = () => {
+            console.log("there was an error")
+        }
+
+        socket.onmessage = message => {
+            let data = JSON.parse(message.data)
+
+            switch (data.action) {
+                case "users-list":
+                    const onlineUsers = document.getElementById("online_users")
+                    while (onlineUsers.firstChild) onlineUsers.removeChild(onlineUsers.firstChild)
+                    if (data.connected_users == null) {
+                        return;
+                    }
+                    if (data.connected_users.length <= 0) {
+                        return
+                    }
+                    data.connected_users.forEach(user => {
+                        let list = document.createElement("li")
+                        list.appendChild(document.createTextNode(user))
+                        onlineUsers.appendChild(list)
+                    })
+                    break
+                case "broadcast":
+                    output.innerHTML += data.message + "<br>"
+                    break
+            }
+        }
+
+        let userInput = document.getElementById('username')
+
+        userInput.addEventListener('change', e => {
+            const res = {
+                "action": "username",
+                "username": e.target.value
+            }
+
+            socket.send(JSON.stringify(res))
+        })
+
+        document.getElementById("message").addEventListener('keydown', e => {
+            if (e.code === "Enter") {
+                if (!socket) {
+                    console.log("no connection")
+                    return false
+                }
+
+                e.preventDefault()
+                e.stopPropagation()
+                sendMessage()
+            }
+        })
+
+        document.getElementById("sendBtn").addEventListener('click', e => {
+            if (
+                (document.getElementById("message").value === "") ||
+                (document.getElementById("username").value === "")
+            ) {
+                alert("fill out")
+                return 0
+            }
+            sendMessage()
+        })
+
+    })
+
+    const sendMessage = () => {
+        const data = {
+            "action": "broadcast",
+            "username": document.getElementById("username").value,
+            "message": document.getElementById("message").value,
+        }
+
+        socket.send(JSON.stringify(data))
+
+        document.getElementById("message").value = ""
+    }
+
+</script>
+</html>
